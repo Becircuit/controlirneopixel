@@ -1,0 +1,166 @@
+
+#include <IRremote.h>
+#include <Adafruit_NeoPixel.h>
+
+#define RECEIVER_PIN 5 // arduino pon for reception
+
+IRrecv receiver(RECEIVER_PIN); // create a receiver object of the IRrecv class
+decode_results results; // create a results object of the decode_results class
+unsigned long key_value = 0; //save the ir code received
+
+int brightness=250; //value for the pixels brightness 
+
+//===My ir codes====
+#define KEY_1 0xFD08F7
+#define KEY_2 0xFD8877
+#define KEY_3 0xFD48B7
+#define KEY_4 0xFD28D7
+#define KEY_5 0xFDA857
+#define KEY_6 0xFD6897
+#define KEY_7 0xFD18E7
+#define KEY_8 0xFD9867
+#define KEY_9 0xFD58A7
+#define KEY_0 0xFD30CF
+#define KEY_RIGHT 0xFD609F
+#define KEY_LEFT 0xFD20DF
+
+
+unsigned long KEY_IR[12]={KEY_1,KEY_2,KEY_3,KEY_4,KEY_5,KEY_6,KEY_7,KEY_8,KEY_9,KEY_0,KEY_LEFT,KEY_RIGHT};
+
+#define NUM_PIXEL 12 //amount of pixels 
+#define PIN 4        //arduino pin for pixelring
+
+uint16_t i, j;             //define the pixel that turn on
+uint8_t color=0;           //change the color
+unsigned long timePixel=0; //time for each pixel turn on
+
+Adafruit_NeoPixel ring = Adafruit_NeoPixel(NUM_PIXEL, PIN, NEO_GRB + NEO_KHZ800);
+ 
+void setup() {
+  Serial.begin(9600);    //serial transmittion at 9600 bauds
+  receiver.enableIRIn(); // enable the receiver
+  receiver.blink13(true); // enable blinking of the built-in LED when IR signal occurs
+  pinMode(13, OUTPUT);
+  
+  ring.begin();          //initialize the pixelring
+  ring.setBrightness(brightness); //set the brightness
+  ring.show(); // Initialize all pixels to 'off'
+  
+}
+ 
+void loop() {
+  if (receiver.decode(&results)){ //if a ir code has been received
+    for(int num=0;num<12;num++){  //cycle for compare with KEY_IR
+          if(results.value==KEY_IR[num]){  //compare the ir code received with KEY_IR (correct ir codes)
+            key_value = results.value; //save the ir code received
+            Serial.println(key_value, HEX);  //show on serial monitor
+
+            i=0;  //reset the variables for the pixels
+            j=0;
+            color=0;
+            colorRing(ring.Color(0, 0, 0), 0); //turn off the pixels
+          
+            num=255;  //put a number >12 for get out of the cycle "for"
+         }
+        
+    }
+    
+      receiver.resume(); // reset the receiver for the next code
+  }
+  
+    switch (key_value) {  //compare the key_value received and saved
+      
+    case KEY_1:
+      Serial.println(KEY_1, HEX); // print the values in the Serial Monitor
+     
+      if(color==0) colorWipe(ring.Color(255, 0, 0), 500); // Red
+      else if(color==1)colorWipe(ring.Color(0, 255, 0), 500); // Green
+      else if(color==2)colorWipe(ring.Color(0, 0, 255), 500); // Blue
+
+      break;    
+    
+    case KEY_2:
+      Serial.println(KEY_2, HEX); // print the values in the Serial Monitor
+      
+      if(color==0) colorWipe(ring.Color(128, 0, 128), 500); // purple
+      else if(color==1)colorWipe(ring.Color(0, 255, 255), 500); // cyan    
+      else if(color==2)colorWipe(ring.Color(255, 255, 0), 500); // yellow
+      
+      
+      break; 
+      
+    case KEY_3:
+      rainbowCycle(20);    
+    break;
+      
+    case KEY_0:
+      colorRing(ring.Color(0, 0, 0), 0); // Black
+      key_value=0;
+    break;
+       
+  }
+   delay(10);
+}
+
+void colorWipe(uint32_t c, uint8_t wait) { //set the color in only one pixel
+  
+  if(i<NUM_PIXEL && millis()-timePixel>wait){ //compare with the "wait" time
+    ring.setPixelColor(i, c); //set the color on pixel i
+    ring.show();        //show the color on pixel
+    
+    i++;                 //increase the pixel number
+    timePixel=millis();  //take the current time
+    
+  }
+  else if(i>=NUM_PIXEL){ //if it reachs NUM_PIXEL, reset the variables and increase the color for keys 6,7,8 
+    i=0;
+    color++;
+    if(color>2) color=0;
+  }
+  
+}
+
+void colorRing(uint32_t c, uint8_t wait){ //set the color in all the pixel ring
+  for(uint16_t pixel=0; pixel<ring.numPixels(); pixel++) {
+      ring.setPixelColor(pixel, c);
+      ring.show();
+      delay(wait);
+  }
+}
+ 
+// Slightly different, this makes the rainbow equally distributed throughout
+void rainbowCycle(uint8_t wait) {
+  
+  if(i<NUM_PIXEL){  
+    ring.setPixelColor(i, Wheel(((i * 256 / ring.numPixels()) + j) & 255)); //set the rgb color (wheel subroutine)
+    i++;  //increase the pixel number
+  }
+  else{
+    ring.show();  //show the color on pixelring
+    delay(wait);   //delay for "wait" time
+    i=0;           //reset the pixel number
+    
+    if(j<256*5){  //for increase the J parameter for rainbowCycle effect
+     j++;
+    }
+    else{
+     j=0;   //reset the J parameter
+    }
+  }
+ 
+}
+ 
+
+// The colours are a transition r - g - b - back to r.
+uint32_t Wheel(byte Pos) {
+  Pos = 255 - Pos;
+  if(Pos < 85) {
+   return ring.Color(255 - Pos * 3, 0, Pos * 3);
+  } else if(Pos < 170) {
+    Pos -= 85;
+   return ring.Color(0, Pos * 3, 255 - Pos * 3);
+  } else {
+   Pos -= 170;
+   return ring.Color(Pos * 3, 255 - Pos * 3, 0);
+  }
+}
